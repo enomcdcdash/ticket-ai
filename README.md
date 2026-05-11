@@ -28,3 +28,10 @@ AI-powered Telecom KPI Analytics Assistant using:
 pip install -r requirements.txt
 streamlit run app.py
 ```
+
+## Sample Questions
+
+- Top 3 regional by total tickets
+- Which area has highest incident volume?
+- Analyze takeover performance
+- Compare incidents vs events
