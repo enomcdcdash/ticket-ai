@@ -1,16 +1,19 @@
 import matplotlib.pyplot as plt
 
-# =========================================
-# CREATE BAR CHART
-# =========================================
-def create_bar_chart(data):
 
-    fig, ax = plt.subplots()
+# =========================================
+# REGIONAL BAR CHART
+# =========================================
+def create_bar_chart(data, title="Chart"):
+
+    fig, ax = plt.subplots(figsize=(10, 5))
 
     data.plot(
         kind="bar",
         ax=ax
     )
+
+    ax.set_title(title)
 
     plt.xticks(rotation=45)
 

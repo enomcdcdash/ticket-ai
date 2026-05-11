@@ -9,59 +9,148 @@ def get_basic_kpi(df):
 
     summary["total_rows"] = len(df)
 
-    numeric_cols = df.select_dtypes(include='number').columns
+    summary["total_tickets"] = df["Total_Tickets"].sum()
 
-    if len(numeric_cols) > 0:
-        summary["total_numeric"] = df[numeric_cols[0]].sum()
-    else:
-        summary["total_numeric"] = 0
+    summary["total_incident"] = df["Total_Incident"].sum()
 
-    summary["columns"] = list(df.columns)
+    summary["total_event"] = df["Total_Event"].sum()
+
+    summary["total_area"] = df["Area"].nunique()
+
+    summary["total_regional"] = df["Regional"].nunique()
 
     return summary
 
 
 # =========================================
-# TOP CATEGORY ANALYSIS
+# TOP REGIONAL TICKET VOLUME
 # =========================================
-def get_top_category(df):
+def get_top_regional(df):
 
-    object_cols = df.select_dtypes(include='object').columns
-    numeric_cols = df.select_dtypes(include='number').columns
-
-    if len(object_cols) == 0 or len(numeric_cols) == 0:
-        return None
-
-    group_col = object_cols[0]
-    value_col = numeric_cols[0]
-
-    result = (
-        df.groupby(group_col)[value_col]
+    regional_summary = (
+        df.groupby("Regional")["Total_Tickets"]
         .sum()
         .sort_values(ascending=False)
         .head(10)
     )
 
-    return result
+    return regional_summary
 
 
 # =========================================
-# GENERATE DATA SUMMARY
+# INCIDENT ANALYSIS
+# =========================================
+def get_incident_analysis(df):
+
+    incident_summary = (
+        df.groupby("Regional")["Total_Incident"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+
+    return incident_summary
+
+
+# =========================================
+# EVENT ANALYSIS
+# =========================================
+def get_event_analysis(df):
+
+    event_summary = (
+        df.groupby("Regional")["Total_Event"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+
+    return event_summary
+
+
+# =========================================
+# TAKEOVER ANALYSIS
+# =========================================
+def get_takeover_analysis(df):
+
+    df["Total_Takeover"] = (
+        df["Total_Incident_Takeover"]
+        + df["Total_Event_Takeover"]
+    )
+
+    takeover_summary = (
+        df.groupby("Regional")["Total_Takeover"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+
+    return takeover_summary
+
+
+# =========================================
+# VISIT ANALYSIS
+# =========================================
+def get_visit_analysis(df):
+
+    df["Total_Visit"] = (
+        df["Total_Incident_Visit"]
+        + df["Total_Event_Visit"]
+    )
+
+    visit_summary = (
+        df.groupby("Regional")["Total_Visit"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+
+    return visit_summary
+
+
+# =========================================
+# DATASET SUMMARY
 # =========================================
 def generate_data_summary(df):
 
-    summary = []
+    total_tickets = df["Total_Tickets"].sum()
 
-    summary.append(f"Dataset contains {len(df)} rows.")
+    total_incident = df["Total_Incident"].sum()
 
-    summary.append(f"Columns: {list(df.columns)}")
+    total_event = df["Total_Event"].sum()
 
-    numeric_cols = df.select_dtypes(include='number').columns
+    top_regional = get_top_regional(df)
 
-    for col in numeric_cols:
+    highest_regional = top_regional.index[0]
 
-        summary.append(
-            f"Column {col} total = {df[col].sum()}"
-        )
+    highest_value = top_regional.iloc[0]
 
-    return "\n".join(summary)
+    summary = f"""
+Telecom KPI Dataset Summary
+
+Total records: {len(df)}
+
+Total tickets: {total_tickets}
+
+Total incidents: {total_incident}
+
+Total events: {total_event}
+
+Highest ticket contributor:
+{highest_regional} with {highest_value} tickets.
+
+The dataset contains telecom operational metrics including:
+- Ticket volume
+- Incident metrics
+- Event metrics
+- Takeover metrics
+- Visit metrics
+- Regional operational performance
+
+Operational focus should prioritize:
+- High ticket regionals
+- High incident regionals
+- High takeover areas
+- Operational escalation areas
+"""
+
+    return summary

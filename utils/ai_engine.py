@@ -1,22 +1,20 @@
-import google.generativeai as genai
 import os
 
 from dotenv import load_dotenv
 
-# =========================================
-# LOAD ENV
-# =========================================
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 load_dotenv()
 
-API_KEY = os.getenv("GEMINI_API_KEY")
-
 # =========================================
-# GEMINI CONFIG
+# GEMINI MODEL
 # =========================================
-genai.configure(api_key=API_KEY)
-
-model = genai.GenerativeModel(
-    "gemini-2.5-flash"
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash-lite",
+    temperature=0.3,
+    google_api_key=os.getenv(
+        "GEMINI_API_KEY"
+    )
 )
 
 # =========================================
@@ -24,27 +22,48 @@ model = genai.GenerativeModel(
 # =========================================
 def ask_ai(question, context, history):
 
+    history_text = ""
+
+    for msg in history:
+
+        history_text += (
+            f"{msg['role']}: "
+            f"{msg['content']}\n"
+        )
+
     prompt = f"""
-    You are TICKET-AI,
-    an AI telecom KPI and ticket analytics assistant.
+You are TICKET-AI,
+an advanced telecom operational intelligence assistant.
 
-    Responsibilities:
-    - Analyze telecom ticket data
-    - Explain KPI trends
-    - Analyze SLA degradation
-    - Provide operational recommendations
-    - Answer professionally
+You analyze:
+- telecom ticket operations
+- incidents
+- events
+- takeover metrics
+- visit metrics
+- regional telecom performance
 
-    Conversation history:
-    {history}
+Use ONLY the provided context.
 
-    Retrieved context:
-    {context}
+If information is unavailable,
+say clearly that the dataset context is insufficient.
 
-    User question:
-    {question}
-    """
+Conversation History:
+{history_text}
 
-    response = model.generate_content(prompt)
+Dataset Context:
+{context}
 
-    return response.text
+User Question:
+{question}
+
+Instructions:
+- Give accurate operational insights
+- Be concise
+- Mention numbers if available
+- Avoid hallucination
+"""
+
+    response = llm.invoke(prompt)
+
+    return response.content

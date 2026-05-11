@@ -3,15 +3,24 @@ import pandas as pd
 
 from utils.analytics import (
     get_basic_kpi,
-    get_top_category,
-    generate_data_summary
+    get_top_regional,
+    get_incident_analysis,
+    get_event_analysis,
+    get_takeover_analysis,
+    get_visit_analysis
 )
 
 from utils.ai_engine import ask_ai
 
 from utils.rag_engine import (
-    store_document,
+    dataframe_to_documents,
+    store_documents,
     search_documents
+)
+
+from utils.database import (
+    save_dataframe,
+    load_dataframe
 )
 
 from utils.charts import create_bar_chart
@@ -25,9 +34,10 @@ st.set_page_config(
 )
 
 # =========================================
-# SESSION MEMORY
+# SESSION STATE
 # =========================================
 if "history" not in st.session_state:
+
     st.session_state.history = []
 
 # =========================================
@@ -36,38 +46,51 @@ if "history" not in st.session_state:
 st.title("📊 TICKET-AI")
 
 st.subheader(
-    "Telecom Intelligent Chatbot for KPI Evaluation and Ticket Analytics"
+    "AI-Powered Telecom KPI Analytics Assistant"
 )
 
 # =========================================
 # SIDEBAR
 # =========================================
-st.sidebar.title("About")
+st.sidebar.title("Dataset Upload")
 
-st.sidebar.info("""
-TICKET-AI is an AI-powered telecom KPI analytics assistant
-using Gemini API, RAG, and ChromaDB.
-""")
-
-# =========================================
-# FILE UPLOADER
-# =========================================
-uploaded_file = st.file_uploader(
-    "Upload KPI Excel File",
+uploaded_file = st.sidebar.file_uploader(
+    "Upload KPI Dataset",
     type=["xlsx", "xls"]
 )
 
 # =========================================
-# MAIN APP
+# LOAD EXISTING DATASET
+# =========================================
+try:
+
+    df = load_dataframe()
+
+    data_loaded = True
+
+except:
+
+    data_loaded = False
+
+# =========================================
+# PROCESS NEW UPLOAD
 # =========================================
 if uploaded_file:
 
-    # =====================================
-    # READ EXCEL
-    # =====================================
     df = pd.read_excel(uploaded_file)
 
-    st.success("File uploaded successfully!")
+    save_dataframe(df)
+
+    data_loaded = True
+
+    st.sidebar.success(
+        "Dataset saved successfully"
+    )
+
+# =========================================
+# MAIN APPLICATION
+# =========================================
+if data_loaded:
 
     # =====================================
     # DATA PREVIEW
@@ -83,94 +106,197 @@ if uploaded_file:
 
     summary = get_basic_kpi(df)
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     col1.metric(
-        "Total Records",
-        summary["total_rows"]
+        "Total Tickets",
+        f"{summary['total_tickets']:,.0f}"
     )
 
     col2.metric(
-        "Total Numeric Value",
-        f"{summary['total_numeric']:,.0f}"
+        "Total Incident",
+        f"{summary['total_incident']:,.0f}"
     )
 
     col3.metric(
-        "Total Columns",
-        len(summary["columns"])
+        "Total Event",
+        f"{summary['total_event']:,.0f}"
+    )
+
+    col4.metric(
+        "Total Area",
+        summary["total_area"]
+    )
+
+    col5.metric(
+        "Total Regional",
+        summary["total_regional"]
     )
 
     # =====================================
-    # CHART SECTION
+    # TOP REGIONAL ANALYSIS
     # =====================================
-    st.subheader("Top Category Analysis")
+    st.subheader("Top Regional Ticket Volume")
 
-    chart_data = get_top_category(df)
+    regional_chart = create_bar_chart(
+        get_top_regional(df),
+        "Top Regional Ticket Volume"
+    )
 
-    if chart_data is not None:
-
-        fig = create_bar_chart(chart_data)
-
-        st.pyplot(fig)
+    st.pyplot(regional_chart)
 
     # =====================================
-    # CREATE RAG KNOWLEDGE
+    # INCIDENT ANALYSIS
     # =====================================
-    dataset_summary = generate_data_summary(df)
+    st.subheader("Incident Analysis")
 
-    store_document(dataset_summary)
+    incident_chart = create_bar_chart(
+        get_incident_analysis(df),
+        "Incident Analysis"
+    )
+
+    st.pyplot(incident_chart)
+
+    # =====================================
+    # EVENT ANALYSIS
+    # =====================================
+    st.subheader("Event Analysis")
+
+    event_chart = create_bar_chart(
+        get_event_analysis(df),
+        "Event Analysis"
+    )
+
+    st.pyplot(event_chart)
+
+    # =====================================
+    # TAKEOVER ANALYSIS
+    # =====================================
+    st.subheader("Takeover Analysis")
+
+    takeover_chart = create_bar_chart(
+        get_takeover_analysis(df),
+        "Takeover Analysis"
+    )
+
+    st.pyplot(takeover_chart)
+
+    # =====================================
+    # VISIT ANALYSIS
+    # =====================================
+    st.subheader("Visit Analysis")
+
+    visit_chart = create_bar_chart(
+        get_visit_analysis(df),
+        "Visit Analysis"
+    )
+
+    st.pyplot(visit_chart)
+
+    # =====================================
+    # BUILD VECTOR DATABASE
+    # =====================================
+    if "rag_loaded" not in st.session_state:
+
+        with st.spinner(
+            "Building AI Knowledge Base..."
+        ):
+
+            documents = dataframe_to_documents(df)
+
+            # limit for performance/quota
+            store_documents(documents[:500])
+
+        st.session_state.rag_loaded = True
+
+        st.success(
+            "AI Knowledge Base Ready"
+        )
 
     # =====================================
     # CHATBOT
     # =====================================
-    st.subheader("💬 AI Chatbot")
+    st.subheader("💬 TICKET-AI Assistant")
 
-    user_question = st.text_input(
-        "Ask a question about your KPI data"
+    # =====================================
+    # DISPLAY CHAT HISTORY
+    # =====================================
+    for message in st.session_state.history:
+
+        with st.chat_message(message["role"]):
+
+            st.markdown(message["content"])
+
+    # =====================================
+    # USER INPUT
+    # =====================================
+    user_question = st.chat_input(
+        "Ask telecom operational questions..."
     )
 
-    if st.button("Analyze"):
-
-        # =================================
-        # RAG SEARCH
-        # =================================
-        retrieved_docs = search_documents(
-            user_question
-        )
-
-        rag_context = "\n".join(retrieved_docs)
-
-        # =================================
-        # AI RESPONSE
-        # =================================
-        answer = ask_ai(
-            question=user_question,
-            context=rag_context,
-            history=st.session_state.history
-        )
-
-        # =================================
-        # SAVE HISTORY
-        # =================================
-        st.session_state.history.append(
-            f"User: {user_question}"
-        )
-
-        st.session_state.history.append(
-            f"Assistant: {answer}"
-        )
-
-        # =================================
-        # DISPLAY ANSWER
-        # =================================
-        st.markdown("### AI Analysis")
-
-        st.write(answer)
-
     # =====================================
-    # HISTORY
+    # PROCESS QUESTION
     # =====================================
-    with st.expander("Conversation History"):
+    if user_question:
 
-        for item in st.session_state.history:
-            st.write(item)
+        # =================================
+        # SHOW USER MESSAGE
+        # =================================
+        with st.chat_message("user"):
+
+            st.markdown(user_question)
+
+        # =================================
+        # SAVE USER MESSAGE
+        # =================================
+        st.session_state.history.append({
+            "role": "user",
+            "content": user_question
+        })
+
+        # =================================
+        # VECTOR SEARCH
+        # =================================
+        results = search_documents(
+            user_question,
+            k=5
+        )
+
+        context = "\n\n".join([
+            doc.page_content
+            for doc in results
+        ])
+
+        # =================================
+        # GENERATE AI RESPONSE
+        # =================================
+        with st.spinner(
+            "Analyzing telecom operations..."
+        ):
+
+            answer = ask_ai(
+                question=user_question,
+                context=context,
+                history=st.session_state.history[-6:]
+            )
+
+        # =================================
+        # SHOW AI RESPONSE
+        # =================================
+        with st.chat_message("assistant"):
+
+            st.markdown(answer)
+
+        # =================================
+        # SAVE AI RESPONSE
+        # =================================
+        st.session_state.history.append({
+            "role": "assistant",
+            "content": answer
+        })
+
+else:
+
+    st.info(
+        "Please upload KPI dataset to begin."
+    )
